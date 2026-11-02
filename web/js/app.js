@@ -1,6 +1,9 @@
 import { VideoSampleSink } from '../vendor/mediabunny.min.mjs';
 import { analyze, frameTimes, matchFrame, openVideo, resolveCells } from './analyze.js';
-import { BLANK, blankGlyph, candidateMask, ensureGlyphs, loadCatalog, loadDictionary } from './dictionary.js';
+import {
+  BLANK, blankGlyph, candidateMask, dataFiles, deleteStoredData, downloadFiles, ensureGlyphs, loadCatalog, loadDictionary,
+  loadMeta, missingFiles, openStore,
+} from './dictionary.js';
 import { CODECS, exportVideo, pickCodec } from './export.js';
 import { applyLanguage, formatNumber, getLanguage, t } from './i18n.js';
 import { CpuMatcher, GpuMatcher } from './matcher.js';
@@ -12,6 +15,7 @@ const MAX_COLUMNS = 64, MAX_ROWS = 48;
 const BLOCKS_KEY = 'unicode-frames-blocks';
 
 const state = {
+  meta: null, store: null, dataReady: false, download: null,
   source: null, catalogPromise: null, catalog: null, dictPromise: null, dict: null, matcher: null,
   selected: null, mask: null,
   result: null, cells: null, settingsKey: '',
@@ -47,7 +51,7 @@ function showError(id, error) {
 // ---------- dictionary ----------
 function catalog() {
   if (!state.catalogPromise) {
-    state.catalogPromise = loadCatalog(DATA).then((loaded) => {
+    state.catalogPromise = loadCatalog(state.meta, state.store).then((loaded) => {
       state.catalog = loaded;
       state.selected = restoreBlocks(loaded);
       renderBlocks();
@@ -62,12 +66,9 @@ function catalog() {
 }
 
 function dictionary() {
+  if (!state.dataReady) return Promise.reject(new Error(t('hint.noData')));
   if (!state.dictPromise) {
-    const started = performance.now();
-    state.dictPromise = catalog().then((loaded) => loadDictionary(loaded, (done, total) => {
-      const seconds = (performance.now() - started) / 1000;
-      setProgress('p-dict', done, total, `${bytes(done)} / ${bytes(total)}${seconds > 1 ? ` · ${bytes(done / seconds)}/s` : ''}`);
-    })).then((dict) => {
+    state.dictPromise = catalog().then((loaded) => loadDictionary(loaded)).then((dict) => {
       state.dict = dict;
       setProgress('p-dict', 1, 1, t('dict.done', { n: number(dict.count) }));
       return dict;
@@ -77,6 +78,96 @@ function dictionary() {
     });
   }
   return state.dictPromise;
+}
+
+// ---------- data download (asks first) ----------
+function totalBytes(files) {
+  return files.reduce((sum, f) => sum + f.bytes, 0);
+}
+
+async function initData() {
+  try {
+    state.meta = await loadMeta(DATA);
+    state.store = await openStore(state.meta, DATA);
+    const missing = await missingFiles(state.store, dataFiles(state.meta));
+    if (!missing.length) { dataReady(true); return; }
+    state.download = { files: missing };
+    await renderConsent();
+  } catch (error) {
+    showError('consent-error', error);
+    $('data-card').hidden = false;
+    $('consent-actions').hidden = true;
+  }
+}
+
+async function renderConsent() {
+  const download = state.download;
+  if (!download) return;
+  const size = bytes(totalBytes(download.files));
+  $('data-card').hidden = false;
+  $('consent-accept').textContent = t('consent.accept', { size });
+  let text = t('consent.size', { size });
+  let note = download.declined ? t('consent.declined') : '';
+  try {
+    const { quota, usage } = await navigator.storage.estimate();
+    if (quota) {
+      text += ' · ' + t('consent.space', { free: bytes(quota - usage) });
+      if (quota - usage < totalBytes(download.files) * 1.1) note = t('consent.lowSpace');
+    }
+  } catch { /* estimate unavailable */ }
+  if (!state.store.cache) note = t('consent.noStorage');
+  $('consent-size').textContent = text;
+  $('consent-note').textContent = download.result?.persistent === false ? t('consent.noStorage') : note;
+}
+
+async function acceptDownload() {
+  const download = state.download;
+  if (!download || download.abort) return;
+  showError('consent-error', null);
+  download.abort = new AbortController();
+  $('consent-accept').hidden = true;
+  $('consent-decline').hidden = true;
+  $('consent-cancel').hidden = false;
+  $('p-download').hidden = false;
+  const started = performance.now();
+  try {
+    // Ask the browser not to evict the data under storage pressure (may be declined silently).
+    navigator.storage?.persist?.().catch(() => {});
+    download.result = await downloadFiles(state.store, download.files, (loaded, total) => {
+      const seconds = (performance.now() - started) / 1000;
+      const rate = loaded / Math.max(seconds, 1e-3);
+      setProgress('p-download', loaded, total, t('download.detail',
+        { loaded: bytes(loaded), total: bytes(total), rate: bytes(rate), eta: clock((total - loaded) / rate) }));
+    }, download.abort.signal);
+    dataReady(download.result.persistent);
+  } catch (error) {
+    showError('consent-error', error);
+    $('consent-accept').hidden = false;
+    $('consent-decline').hidden = false;
+  } finally {
+    download.abort = null;
+    $('consent-cancel').hidden = true;
+  }
+}
+
+function dataReady(persistent) {
+  state.dataReady = true;
+  // A copy kept only in memory is gone next visit: say so instead of hiding the card.
+  $('data-card').hidden = persistent;
+  if (!persistent) {
+    $('consent-actions').hidden = true;
+    $('consent-note').textContent = t('consent.noStorage');
+  }
+  renderStoredData();
+  catalog().catch((error) => showError('analyze-error', error));
+  if (state.source) dictionary().catch((error) => showError('analyze-error', error));
+  updateGrid();
+}
+
+function renderStoredData() {
+  const show = state.dataReady && !!state.store?.cache && !state.store.memory.size;
+  $('stored-data').hidden = !show;
+  if (show) $('stored-data-text').textContent = t('data.stored', { size: bytes(totalBytes(dataFiles(state.meta))) });
 }
 
 // ---------- Unicode blocks ----------
@@ -137,7 +228,7 @@ function shownBlocks() {
 function renderBlocks() {
   const list = $('block-list');
   if (!state.catalog) {
-    $('blocks-summary').textContent = t('blocks.loading');
+    $('blocks-summary').textContent = state.dataReady ? t('blocks.loading') : t('hint.noData');
     return;
   }
   const shown = shownBlocks();
@@ -198,7 +289,7 @@ async function selectFile(file) {
     $('video-facts').hidden = false;
     $('include-audio-wrap').hidden = !source.audio;
     $('preview-position').disabled = false;
-    dictionary().catch((error) => showError('analyze-error', error));
+    if (state.dataReady) dictionary().catch((error) => showError('analyze-error', error));
     await loadPreviewFrame();
   } catch (error) {
     state.source = null;
@@ -260,8 +351,9 @@ function updateGrid() {
   }
   const mask = currentMask();
   const noBlocks = mask && mask.count === 0;
-  $('analyze').disabled = !source || !!state.abort || noBlocks || !mask;
-  $('analyze-hint').textContent = !source ? t('hint.noVideo')
+  $('analyze').disabled = !source || !!state.abort || noBlocks || !mask || !state.dataReady;
+  $('analyze-hint').textContent = !state.dataReady ? t('hint.noData')
+    : !source ? t('hint.noVideo')
     : noBlocks ? t('hint.noBlocks')
     : state.result && settingsKey() !== state.settingsKey ? t('hint.changed')
     : state.result ? t('hint.done') : '';
@@ -348,6 +440,7 @@ async function runPreview() {
   const useBlank = $('use-blank').checked;
   const key = `${columns}x${rows}|${mask?.key}|${useBlank}|${$('preview-position').value}|${source.file.name}`;
   if (key === state.previewKey) return;
+  if (!state.dataReady) { setPreviewNote(t('hint.noData')); return; }
   if (state.abort) { setPreviewNote(t('preview.busy')); return; }
   if (!mask || mask.count === 0) {
     setPreviewNote(mask ? t('hint.noBlocks') : t('preview.loading'));
@@ -757,11 +850,25 @@ $('play').addEventListener('click', () => state.playing ? stopPlayback() : start
 for (const id of ['height', 'quality']) $(id).addEventListener('change', updateExportSize);
 $('export').addEventListener('click', runExport);
 $('download-text').addEventListener('click', downloadText);
+$('consent-accept').addEventListener('click', acceptDownload);
+$('consent-decline').addEventListener('click', () => {
+  if (!state.download) return;
+  state.download.declined = true;
+  renderConsent();
+});
+$('consent-cancel').addEventListener('click', () => state.download?.abort?.abort());
+$('delete-data').addEventListener('click', async () => {
+  if (!window.confirm(t('data.confirmDelete'))) return;
+  await deleteStoredData();
+  location.reload();
+});
 $('lang').addEventListener('click', () => {
   applyLanguage(getLanguage() === 'en' ? 'ja' : 'en');
   $('lang').lang = getLanguage() === 'en' ? 'ja' : 'en';
   $('play').setAttribute('aria-label', t(state.playing ? 'pause' : 'play'));
   renderFacts();
+  renderConsent();
+  renderStoredData();
   renderBlocks();
   updateGrid();
   renderSummary();
@@ -773,7 +880,7 @@ applyLanguage();
 $('lang').lang = getLanguage() === 'en' ? 'ja' : 'en';
 renderBlocks();
 updateGrid();
-catalog().catch((error) => showError('analyze-error', error));
+initData();
 
 // ?video=URL loads a video without the file picker (handy for testing and links).
 const linked = new URLSearchParams(location.search).get('video');

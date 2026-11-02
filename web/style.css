@@ -128,6 +128,11 @@ progress::-moz-progress-bar { background: var(--teal); }
 
 .export-options { display: flex; flex-wrap: wrap; align-items: end; gap: 14px 20px; }
 .credits { padding: 8px 0 48px; color: var(--muted); font-size: 12px; }
+.consent { border-color: #3a4560; }
+.consent p { margin: 0 0 10px; max-width: 46em; }
+.consent-size { font: 600 15px var(--mono); color: var(--yellow); }
+.consent .progress { margin-top: 16px; }
+.link-button { padding: 0; border: 0; background: none; color: var(--teal); font: inherit; text-decoration: underline; cursor: pointer; }
 .credits p { margin: 0 0 8px; max-width: 60em; }
 
 @media (max-width: 760px) {

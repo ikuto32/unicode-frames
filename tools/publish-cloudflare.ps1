@@ -1,7 +1,7 @@
 # Deploy web/ (including the generated web/data) to Cloudflare as a Worker with static assets,
 # served only on a custom domain (the domain must be a zone in the same Cloudflare account).
 # Static asset requests are not billed or limited. First time: run `npx wrangler@4.151.2 login` once.
-param([string]$Domain = 'ikutotest.xyz', [string]$Name = 'unicode-frames', [string]$Wrangler = 'wrangler@4.151.2')
+param([string]$Domain = 'unicode-frames.ikutotest.xyz', [string]$Name = 'unicode-frames', [string]$Wrangler = 'wrangler@4.151.2')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $web = Join-Path $root 'web'
@@ -19,12 +19,11 @@ foreach ($file in @('.gitignore', 'test-video.mp4')) {
 # Cloudflare rejects asset files over 25 MiB.
 $large = Get-ChildItem -LiteralPath $site -Recurse -File | Where-Object { $_.Length -gt 25MB }
 if ($large) { throw "Files over 25 MiB: $($large.Name -join ', '). Re-run web-export." }
-# meta.json names the current build; the binary files may be cached briefly.
+# meta.json names the current build and must always be re-checked. The app keeps the
+# data files in Cache Storage itself, so they need no long HTTP caching.
 @'
 /data/meta.json
   Cache-Control: no-cache
-/data/*
-  Cache-Control: public, max-age=3600
 '@ | Set-Content -LiteralPath (Join-Path $site '_headers') -Encoding utf8
 @"
 {

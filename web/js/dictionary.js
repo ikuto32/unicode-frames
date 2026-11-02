@@ -1,50 +1,110 @@
 import { t } from './i18n.js';
 
 // Static dictionary produced by `python -m badapple_unicode web-export`.
-// Matching data is downloaded once and kept in Cache Storage; glyph shapes are
-// fetched per candidate with HTTP Range requests only when a video uses them.
+// Every data file is downloaded once, with the visitor's permission, and kept in
+// Cache Storage. Glyph shapes are then read by slicing the stored files, so the
+// host needs no HTTP Range support.
 
 const CACHE_PREFIX = 'badapple-unicode-dictionary-';
 export const BLANK = -2;
 
-async function openCache(build) {
-  if (!('caches' in self)) return null;
-  try {
-    for (const name of await caches.keys()) {
-      if (name.startsWith(CACHE_PREFIX) && name !== CACHE_PREFIX + build) await caches.delete(name);
-    }
-    return await caches.open(CACHE_PREFIX + build);
-  } catch {
-    return null;
-  }
+export async function loadMeta(base) {
+  const response = await fetch(new URL('meta.json', base), { cache: 'no-cache' });
+  if (!response.ok) throw new Error(t('err.noData', { status: response.status }));
+  return response.json();
 }
 
-async function fetchBytes(url, cache, onBytes) {
-  if (cache) {
-    const hit = await cache.match(url).catch(() => null);
-    if (hit) {
-      const buffer = await hit.arrayBuffer();
-      onBytes(buffer.byteLength);
-      return buffer;
+// Every file the app needs, with its exact size.
+export function dataFiles(meta) {
+  return [
+    { url: meta.pca, bytes: (768 + meta.dims * 768) * 4 },
+    { url: meta.glyphIndex, bytes: (meta.candidates + 1) * 4 },
+    { url: meta.codepoints, bytes: meta.candidates * 4 },
+    ...meta.features.map((f) => ({ url: f.url, bytes: f.rows * meta.dims })),
+    ...meta.glyphFiles.map((f) => ({ url: f.url, bytes: f.bytes })),
+  ];
+}
+
+// Cache Storage for this build (older builds are removed); a Map in memory when unavailable.
+export async function openStore(meta, base) {
+  const store = { base, cache: null, memory: new Map() };
+  if ('caches' in self) {
+    try {
+      for (const name of await caches.keys()) {
+        if (name.startsWith(CACHE_PREFIX) && name !== CACHE_PREFIX + meta.build) await caches.delete(name);
+      }
+      store.cache = await caches.open(CACHE_PREFIX + meta.build);
+    } catch {
+      store.cache = null;
     }
   }
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
-  const reader = response.body.getReader();
-  const chunks = [];
-  let length = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    length += value.byteLength;
-    onBytes(value.byteLength);
+  return store;
+}
+
+const fileUrl = (store, name) => new URL(name, store.base).href;
+
+async function stored(store, name) {
+  const url = fileUrl(store, name);
+  if (store.memory.has(url)) return store.memory.get(url);
+  const hit = store.cache ? await store.cache.match(url).catch(() => null) : null;
+  return hit ? hit.blob() : null;
+}
+
+export async function missingFiles(store, files) {
+  const missing = [];
+  for (const file of files) {
+    const blob = await stored(store, file.url);
+    if (!blob || blob.size !== file.bytes) missing.push(file);
   }
-  const bytes = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  if (cache) await cache.put(url, new Response(bytes.slice())).catch(() => {});
-  return bytes.buffer;
+  return missing;
+}
+
+export async function deleteStoredData() {
+  if (!('caches' in self)) return;
+  for (const name of await caches.keys()) if (name.startsWith(CACHE_PREFIX)) await caches.delete(name);
+}
+
+export async function downloadFiles(store, files, onProgress = () => {}, signal) {
+  const total = files.reduce((sum, f) => sum + f.bytes, 0);
+  let loaded = 0;
+  let next = 0;
+  const worker = async () => {
+    while (next < files.length) {
+      const file = files[next++];
+      const url = fileUrl(store, file.url);
+      const response = await fetch(url, { cache: 'no-cache', signal });
+      if (!response.ok) throw new Error(`${file.url}: HTTP ${response.status}`);
+      const reader = response.body.getReader();
+      const chunks = [];
+      let size = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        size += value.byteLength;
+        loaded += value.byteLength;
+        onProgress(loaded, total);
+      }
+      if (size !== file.bytes) throw new Error(t('err.size'));
+      const blob = new Blob(chunks);
+      let kept = false;
+      if (store.cache) {
+        try {
+          await store.cache.put(url, new Response(blob, { headers: { 'Content-Length': String(size) } }));
+          kept = true;
+        } catch { /* quota exceeded: keep it in memory for this visit */ }
+      }
+      if (!kept) store.memory.set(url, blob);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(3, files.length) }, worker));
+  return { persistent: store.memory.size === 0 };
+}
+
+async function storedBytes(store, name) {
+  const blob = await stored(store, name);
+  if (!blob) throw new Error(t('err.size'));
+  return blob.arrayBuffer();
 }
 
 function blockIndex(blocks, cp) {
@@ -58,13 +118,9 @@ function blockIndex(blocks, cp) {
   return -1;
 }
 
-// Small part of the dictionary (meta + one code point per candidate), enough for the block picker.
-export async function loadCatalog(base) {
-  const metaResponse = await fetch(new URL('meta.json', base), { cache: 'no-cache' });
-  if (!metaResponse.ok) throw new Error(t('err.noData', { status: metaResponse.status }));
-  const meta = await metaResponse.json();
-  const cache = await openCache(meta.build);
-  const codepoints = new Uint32Array(await fetchBytes(new URL(meta.codepoints, base).href, cache, () => {}));
+// Small part of the dictionary (one code point per candidate), enough for the block picker.
+export async function loadCatalog(meta, store) {
+  const codepoints = new Uint32Array(await storedBytes(store, meta.codepoints));
   if (codepoints.length !== meta.candidates) throw new Error(t('err.size'));
   const NONE = 0xffff;
   const blockOf = new Uint16Array(meta.candidates);
@@ -74,7 +130,7 @@ export async function loadCatalog(base) {
     blockOf[c] = b < 0 ? NONE : b;
     if (b >= 0) blockCounts[b]++;
   }
-  return { meta, base, cache, codepoints, blockOf, blockCounts };
+  return { meta, store, codepoints, blockOf, blockCounts };
 }
 
 // One bit per candidate: 1 when its block is selected.
@@ -90,19 +146,15 @@ export function candidateMask(catalog, selectedBlocks) {
   return { words, count };
 }
 
-export async function loadDictionary(catalog, onProgress = () => {}) {
-  const { meta, base, cache } = catalog;
-  const files = [meta.pca, meta.glyphIndex, ...meta.features.map((f) => f.url)];
-  const total = meta.features.reduce((sum, f) => sum + f.rows * meta.dims, 0)
-    + (meta.candidates + 1) * 4 + (768 + meta.dims * 768) * 4;
-  let loaded = 0;
-  const progress = (bytes) => { loaded += bytes; onProgress(loaded, total); };
-  const buffers = await Promise.all(files.map((name) => fetchBytes(new URL(name, base).href, cache, progress)));
-  const pca = new Float32Array(buffers[0]);
+export async function loadDictionary(catalog) {
+  const { meta, store } = catalog;
+  const [pcaBuffer, indexBuffer, ...featureBuffers] = await Promise.all(
+    [meta.pca, meta.glyphIndex, ...meta.features.map((f) => f.url)].map((name) => storedBytes(store, name)));
+  const pca = new Float32Array(pcaBuffer);
   const dims = meta.dims;
   const features = new Int8Array(meta.candidates * dims);
   let offset = 0;
-  for (const buffer of buffers.slice(2)) {
+  for (const buffer of featureBuffers) {
     features.set(new Int8Array(buffer), offset);
     offset += buffer.byteLength;
   }
@@ -122,11 +174,14 @@ export async function loadDictionary(catalog, onProgress = () => {}) {
     for (let k = 0; k < 768; k++) acc -= mean[k] * components[d * 768 + k];
     blank[d] = Math.max(-127, Math.min(127, Math.round(acc / meta.scale)));
   }
+  // Stored glyph files as Blobs: slicing reads only the needed bytes.
+  const glyphBlobs = await Promise.all(meta.glyphFiles.map((f) => stored(store, f.url)));
+  if (glyphBlobs.some((blob, i) => !blob || blob.size !== meta.glyphFiles[i].bytes)) throw new Error(t('err.size'));
   return {
     ...catalog, dims, scale: meta.scale, count: meta.candidates,
     features, gnorm, mean, components, blank,
-    glyphIndex: new Uint32Array(buffers[1]),
-    glyphs: new Map(), wholeFiles: new Map(),
+    glyphIndex: new Uint32Array(indexBuffer), glyphBlobs,
+    glyphs: new Map(),
   };
 }
 
@@ -151,32 +206,11 @@ function fileFor(dict, position) {
   return lo;
 }
 
-async function fetchRange(dict, fileIndex, start, end) {
-  const file = dict.meta.glyphFiles[fileIndex];
-  const whole = dict.wholeFiles.get(fileIndex);
-  if (whole) return new Uint8Array(await whole, start, end - start);
-  const url = new URL(file.url, dict.base);
-  const response = await fetch(url, { headers: { Range: `bytes=${start}-${end - 1}` } });
-  // A range of a compressed copy would report a different total size: don't trust it.
-  const total = Number(/\/(\d+)$/.exec(response.headers.get('Content-Range') || '')?.[1]);
-  if (response.status === 206 && total === file.bytes) return new Uint8Array(await response.arrayBuffer());
-  if (response.ok) {
-    // Range unsupported: download the whole file once and serve every later lookup from it.
-    const promise = response.status === 206
-      ? fetch(url).then((r) => { if (!r.ok) throw new Error(`${file.url}: HTTP ${r.status}`); return r.arrayBuffer(); })
-      : response.arrayBuffer();
-    dict.wholeFiles.set(fileIndex, promise);
-    return new Uint8Array(await promise, start, end - start);
-  }
-  throw new Error(`${file.url}: HTTP ${response.status}`);
-}
-
-// Fetch and parse every glyph id in `ids` that is not loaded yet.
+// Parse every glyph id in `ids` that is not loaded yet, reading nearby records together.
 export async function ensureGlyphs(dict, ids, onProgress = () => {}) {
   const missing = [...new Set(ids)].filter((id) => id >= 0 && !dict.glyphs.has(id)).sort((a, b) => a - b);
   if (!missing.length) return;
   const index = dict.glyphIndex;
-  // Merge nearby records into one request.
   const ranges = [];
   for (const id of missing) {
     const start = index[id], end = index[id + 1], file = fileFor(dict, start);
@@ -189,21 +223,17 @@ export async function ensureGlyphs(dict, ids, onProgress = () => {}) {
     }
   }
   let done = 0;
-  let next = 0;
-  const worker = async () => {
-    while (next < ranges.length) {
-      const range = ranges[next++];
-      const fileStart = dict.meta.glyphFiles[range.file].start;
-      const bytes = await fetchRange(dict, range.file, range.start - fileStart, range.end - fileStart);
-      for (const id of range.ids) {
-        const local = index[id] - range.start;
-        dict.glyphs.set(id, await parseGlyph(dict, id, bytes.subarray(local, local + index[id + 1] - index[id])));
-      }
-      done += range.ids.length;
-      onProgress(done, missing.length);
+  for (const range of ranges) {
+    const fileStart = dict.meta.glyphFiles[range.file].start;
+    const bytes = new Uint8Array(await dict.glyphBlobs[range.file]
+      .slice(range.start - fileStart, range.end - fileStart).arrayBuffer());
+    for (const id of range.ids) {
+      const local = index[id] - range.start;
+      dict.glyphs.set(id, await parseGlyph(dict, id, bytes.subarray(local, local + index[id + 1] - index[id])));
     }
-  };
-  await Promise.all(Array.from({ length: Math.min(8, ranges.length) }, worker));
+    done += range.ids.length;
+    onProgress(done, missing.length);
+  }
 }
 
 async function parseGlyph(dict, id, bytes) {

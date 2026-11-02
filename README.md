@@ -1,6 +1,6 @@
 # Bad Apple!! / 1フレーム = Unicode 1文字
 
-**ブラウザ版：https://ikuto32.github.io/unicode-frames/** （任意の動画で、インストール不要）
+**ブラウザ版：https://unicode-frames.ikutotest.xyz/** （任意の動画で、インストール不要）
 
 Bad Apple!! の各フレームに最も近い **実在のUnicode 1文字** を、約41万の字形候補から全探索で選び、動画にするツールです。中央に選ばれた文字、右上に元映像、下部に `U+XXXX 文字名` とUnicode上の位置を表示します。音声は元動画から取り込みます。
 
@@ -10,7 +10,7 @@ Bad Apple!! の各フレームに最も近い **実在のUnicode 1文字** を�
 
 ## ブラウザ版
 
-[web/](web/) は、任意の動画から同じスタイルの動画を作る静的サイトです。GitHub Pagesで公開できます。動画はアップロードせず、解析も書き出しもブラウザ内で行います。UIは英語（既定）と日本語です。
+[web/](web/) は、任意の動画から同じスタイルの動画を作る静的サイトです。Cloudflareで公開しています。動画はアップロードせず、解析も書き出しもブラウザ内で行います。UIは英語（既定）と日本語です。
 
 - 画面に使う文字数を列×行で指定します（1×1〜64×48）。各マスを独立に照合します。
 - 使うUnicodeブロックを選べます。プリセット（ASCII、ラテン文字、かな、漢字、罫線・ブロック図形、点字、絵文字）と、名前・コードポイントでの絞り込みがあります。選んだブロックはブラウザに保存されます。空白を候補に含めるかも切り替えられ、こちらは再解析なしで反映されます。
@@ -20,7 +20,9 @@ Bad Apple!! の各フレームに最も近い **実在のUnicode 1文字** を�
 
 照合はCLIと同じ410,510字形が対象です。特徴量はCLIと同じ32×24・ぼかし0.65で、PillowのLanczos縮小とGaussianBlurの丸めまで移植しています（Pillowと全画素一致することをテストで確認）。配信できるサイズにするため、768次元の特徴量をPCAで128次元に圧縮し、全次元共通のスケールでint8にしています（52MB、分散の91.3%を保持）。WebGPUのint8内積で全候補を総当たりし、同距離なら辞書の先頭の候補を選びます。WebGPUがない環境ではWeb Workerで同じ計算をします。Bad Appleの1文字版（6,955フレーム）では、CLIの768次元全探索と同じ文字を選んだフレームが81.0%でした。異なるフレームも、選んだ文字の距離は最適値と平均0.6%しか違いません。
 
-ブロックの選択は候補ごとのコードポイント（`data/codepoints.bin`）から作るビットマスクで、GPUの全探索でマスク外の候補を飛ばします。字形の輪郭は候補ごとに `data/glyphs-*.bin` に格納し、動画で使う分だけHTTP Rangeリクエストで取得します。Unifontはドット形状をそのままビットマップで持ちます。
+ブロックの選択は候補ごとのコードポイント（`data/codepoints.bin`）から作るビットマスクで、GPUの全探索でマスク外の候補を飛ばします。字形の輪郭は候補ごとに `data/glyphs-*.bin` に格納します。Unifontはドット形状をそのままビットマップで持ちます。
+
+サイトを開くと、まず必要なデータの量（約260MB）とブラウザの空き容量を表示し、許可を求めます。許可するとすべてのデータをダウンロードしてブラウザ（Cache Storage）に保存し、次回からは確認なしで保存済みのデータを使います。保存したデータはページ下部のリンクから削除できます。字形は保存済みのファイルから必要な部分だけを読み出すため、配信側にHTTP Rangeへの対応は要りません。
 
 ### データの生成と公開
 
@@ -30,25 +32,19 @@ Bad Apple!! の各フレームに最も近い **実在のUnicode 1文字** を�
 .venv\Scripts\python -m badapple_unicode web-export --dictionary cache/full-dictionary --output web/data
 ```
 
-ローカルでの確認には、Rangeリクエストに対応したサーバーを使います（`python -m http.server` はRange非対応のため、字形ファイルを丸ごと読み込みます）。
+ローカルで確認するには、`web/` を静的サーバーで配信します。
 
 ```powershell
 node tools/serve-web.mjs 8000
 ```
 
-`web/data/` は生成物なのでmainブランチには含めません。公開時は `web/` 全体を `gh-pages` ブランチへ単一コミットで強制プッシュし、GitHubの Settings → Pages で `gh-pages` / `(root)` を選びます。
+`web/data/` は生成物なのでmainブランチには含めません。公開はCloudflareのWorker（静的アセットのみ）で行います。静的ファイルへのリクエストは無料で、回数の制限もありません。指定したドメインだけで配信し、`workers.dev` やプレビュー用のURLは無効にします。ドメインは同じCloudflareアカウントのゾーンである必要があります。初回は `npx wrangler@4.151.2 login` でログインします。字形ファイルはCloudflareの上限（1ファイル25 MiB）に収まるよう20MBごとに分けています。
 
 ```powershell
-.\tools\publish-pages.ps1
+.\tools\publish-cloudflare.ps1 -Domain unicode-frames.ikutotest.xyz
 ```
 
-Cloudflareにも置けます（静的ファイルへのリクエストは無料・無制限）。Workerの静的アセットとして、指定したドメインだけで配信します。ドメインは同じCloudflareアカウントのゾーンである必要があります。初回は `npx wrangler@4.151.2 login` でログインします。字形ファイルはCloudflareの上限（1ファイル25 MiB）に収まるよう20MBごとに分けています。
-
-```powershell
-.\tools\publish-cloudflare.ps1 -Domain ikutotest.xyz
-```
-
-初回の訪問者は辞書データ約55MBをダウンロードします（2回目以降はブラウザのキャッシュから読み込みます）。GitHub Pagesの帯域の目安は月100GBです。
+Cloudflare Accessで既定ですべてのホストを保護している場合は、公開するホスト名に「Bypass / Everyone」のポリシーを付けたアプリケーションが必要です。
 
 対応ブラウザ：WebCodecsが必要です（Chrome / Edge、Safari、Firefoxの最近の版）。WebGPUがあると照合が大幅に速くなります。
 

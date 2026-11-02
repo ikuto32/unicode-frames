@@ -1,4 +1,4 @@
-// Minimal static server for web/ with HTTP Range support, like GitHub Pages.
+// Minimal static server for web/ (local testing). Also answers HTTP Range requests.
 // Usage: node tools/serve-web.mjs [port]
 import { createReadStream, statSync } from 'node:fs';
 import { createServer } from 'node:http';

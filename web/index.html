@@ -22,6 +22,20 @@
 </header>
 
 <main class="wrap">
+  <section class="card consent" id="data-card" hidden>
+    <h2 data-i18n="consent.title">Download the glyph data</h2>
+    <p data-i18n="consent.body">To redraw videos in your browser, this site needs its glyph dictionary: the shapes and matching data of all 410,510 glyphs. It is downloaded once and kept in this browser, so later visits load it without downloading again.</p>
+    <p class="consent-size" id="consent-size"></p>
+    <div class="actions" id="consent-actions">
+      <button type="button" class="primary" id="consent-accept"></button>
+      <button type="button" class="ghost" id="consent-decline" data-i18n="consent.decline">Not now</button>
+      <button type="button" class="ghost" id="consent-cancel" hidden data-i18n="cancel">Cancel</button>
+    </div>
+    <div class="progress" id="p-download" hidden><span class="label" data-i18n="progress.download">Download</span><progress max="1" value="0"></progress><span class="detail"></span></div>
+    <p class="hint" id="consent-note"></p>
+    <p class="error" id="consent-error" hidden></p>
+  </section>
+
   <section class="card" id="step-video">
     <h2><span class="num">1</span><span data-i18n="step.video">Choose a video</span></h2>
     <label class="drop" id="drop">
@@ -169,6 +183,7 @@
 </main>
 
 <footer class="wrap credits">
+  <p class="stored-data" id="stored-data" hidden><span id="stored-data-text"></span> <button type="button" class="link-button" id="delete-data" data-i18n="data.delete">Delete downloaded data</button></p>
   <p data-i18n="credits.method">How characters are chosen: each cell is reduced to 32×24 and blurred, then compared with 410,510 glyphs rendered from all 244 Noto, GNU Unifont and Jigmo fonts (Unicode 17, 155,230 code points). The search is exhaustive over features compressed to 128 dimensions with PCA.</p>
   <p data-i18n-html="credits.fonts">Fonts: <a href="https://notofonts.github.io/">Noto</a> (SIL Open Font License 1.1), <a href="https://unifoundry.com/unifont/">GNU Unifont</a> (GPL 2.0+ with font embedding exception / OFL 1.1), <a href="https://kamichikoichi.github.io/jigmo/">Jigmo</a> (CC0 1.0). Unicode data: Unicode License v3. Video processing: <a href="https://mediabunny.dev/">Mediabunny</a> (MPL 2.0). See <a href="LICENSES.html">licenses</a>.</p>
 </footer>
