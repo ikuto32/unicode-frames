@@ -1,5 +1,7 @@
 # Bad Apple!! / 1フレーム = Unicode 1文字
 
+**ブラウザ版：https://ikuto32.github.io/unicode-frames/** （任意の動画で、インストール不要）
+
 Bad Apple!! の各フレームに最も近い **実在のUnicode 1文字** を、約41万の字形候補から全探索で選び、動画にするツールです。中央に選ばれた文字、右上に元映像、下部に `U+XXXX 文字名` とUnicode上の位置を表示します。音声は元動画から取り込みます。
 
 - 4列×3行の12文字版: [docs/GRID-4X3.md](docs/GRID-4X3.md)

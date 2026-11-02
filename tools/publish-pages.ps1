@@ -19,6 +19,8 @@ foreach ($name in @('.gitignore', 'test-video.mp4')) {
 New-Item -ItemType File -Path (Join-Path $stage '.nojekyll') | Out-Null
 try {
     git -C $stage init -q -b $Branch
+    # Fetch the published tip (if any) so unchanged data files are not uploaded again.
+    git -C $stage fetch -q --depth 1 $Remote "${Branch}:refs/remotes/origin/${Branch}" 2>$null
     git -C $stage add -A
     git -C $stage commit -q -m 'Publish Unicode Frames'
     if ($LASTEXITCODE -ne 0) { throw 'git commit failed' }

@@ -157,10 +157,14 @@ async function fetchRange(dict, fileIndex, start, end) {
   if (whole) return new Uint8Array(await whole, start, end - start);
   const url = new URL(file.url, dict.base);
   const response = await fetch(url, { headers: { Range: `bytes=${start}-${end - 1}` } });
-  if (response.status === 206) return new Uint8Array(await response.arrayBuffer());
+  // A range of a compressed copy would report a different total size: don't trust it.
+  const total = Number(/\/(\d+)$/.exec(response.headers.get('Content-Range') || '')?.[1]);
+  if (response.status === 206 && total === file.bytes) return new Uint8Array(await response.arrayBuffer());
   if (response.ok) {
-    // Server ignored Range: keep the whole file for every later lookup.
-    const promise = response.arrayBuffer();
+    // Range unsupported: download the whole file once and serve every later lookup from it.
+    const promise = response.status === 206
+      ? fetch(url).then((r) => { if (!r.ok) throw new Error(`${file.url}: HTTP ${r.status}`); return r.arrayBuffer(); })
+      : response.arrayBuffer();
     dict.wholeFiles.set(fileIndex, promise);
     return new Uint8Array(await promise, start, end - start);
   }
