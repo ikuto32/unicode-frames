@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unicode Frames</title>
+<meta name="description" content="Redraw every frame of a video with the closest Unicode character, chosen from 410,510 glyphs. Runs entirely in your browser.">
+<link rel="stylesheet" href="style.css">
+<script type="module" src="js/app.js"></script>
+</head>
+<body>
+<header class="masthead">
+  <div class="wrap">
+    <div class="topline">
+      <p class="eyebrow">U+0000 … U+10FFFF</p>
+      <button type="button" class="lang" id="lang" lang="ja" data-i18n="lang.switch">日本語</button>
+    </div>
+    <h1>Unicode Frames</h1>
+    <p class="lede" data-i18n="lede">Redraws every frame of a video with the closest Unicode character, chosen from 410,510 glyphs. You decide how many characters fill the screen.</p>
+    <p class="privacy" data-i18n="privacy">Your video is never uploaded. Analysis and export run entirely in this browser.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card" id="step-video">
+    <h2><span class="num">1</span><span data-i18n="step.video">Choose a video</span></h2>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept="video/*,.mkv,.webm,.mov,.mp4">
+      <span class="drop-main" data-i18n="drop.main">Drop a video file here, or click to choose</span>
+      <span class="drop-sub" data-i18n="drop.sub">MP4, WebM, MOV, MKV — any format your browser can decode</span>
+    </label>
+    <dl class="facts" id="video-facts" hidden></dl>
+    <p class="error" id="video-error" hidden></p>
+  </section>
+
+  <section class="card" id="step-grid">
+    <h2><span class="num">2</span><span data-i18n="step.grid">Characters on screen</span></h2>
+    <div class="grid-setup">
+      <div class="grid-controls">
+        <div class="presets" id="presets" role="group" aria-label="Presets" data-i18n-label="presets">
+          <button type="button" data-grid="1x1">1 × 1</button>
+          <button type="button" data-grid="4x3">4 × 3</button>
+          <button type="button" data-grid="8x6">8 × 6</button>
+          <button type="button" data-grid="16x12">16 × 12</button>
+          <button type="button" data-grid="32x24">32 × 24</button>
+        </div>
+        <div class="dims">
+          <label><span data-i18n="columns">Columns</span> <input type="number" id="columns" min="1" max="64" value="1" inputmode="numeric"></label>
+          <span class="times">×</span>
+          <label><span data-i18n="rows">Rows</span> <input type="number" id="rows" min="1" max="48" value="1" inputmode="numeric"></label>
+        </div>
+        <p class="count"><span id="cell-count">1</span><small data-i18n="perFrame">characters per frame</small></p>
+        <label class="field"><span data-i18n="fps">Frame rate</span>
+          <select id="fps">
+            <option value="source" data-i18n="fps.source">Same as source</option>
+            <option value="30">30 fps</option>
+            <option value="24">24 fps</option>
+            <option value="15">15 fps</option>
+            <option value="10">10 fps</option>
+          </select>
+        </label>
+        <p class="estimate" id="estimate"></p>
+      </div>
+      <div class="charset">
+        <details class="blocks" id="blocks-panel">
+          <summary><span class="blocks-title" data-i18n="blocks.title">Allowed Unicode blocks</span><span class="blocks-summary" id="blocks-summary"></span></summary>
+          <div class="block-presets" id="block-presets" role="group">
+            <button type="button" data-preset="all" data-i18n="preset.all">All</button>
+            <button type="button" data-preset="ascii" data-i18n="preset.ascii">ASCII</button>
+            <button type="button" data-preset="latin" data-i18n="preset.latin">Latin</button>
+            <button type="button" data-preset="kana" data-i18n="preset.kana">Kana</button>
+            <button type="button" data-preset="cjk" data-i18n="preset.cjk">CJK ideographs</button>
+            <button type="button" data-preset="shapes" data-i18n="preset.shapes">Box &amp; block shapes</button>
+            <button type="button" data-preset="braille" data-i18n="preset.braille">Braille</button>
+            <button type="button" data-preset="emoji" data-i18n="preset.emoji">Emoji &amp; pictographs</button>
+          </div>
+          <div class="block-tools">
+            <input type="search" id="block-search" placeholder="Filter by name or code point" data-i18n-placeholder="blocks.search">
+            <button type="button" id="blocks-select-shown" data-i18n="blocks.selectShown">Select shown</button>
+            <button type="button" id="blocks-clear-shown" data-i18n="blocks.clearShown">Clear shown</button>
+          </div>
+          <div class="block-list" id="block-list"></div>
+        </details>
+        <label class="switch"><input type="checkbox" id="use-blank"><span data-i18n="toggle.blank">Allow whitespace</span></label>
+      </div>
+    </div>
+    <div class="grid-preview">
+      <figure>
+        <canvas id="grid-canvas" width="480" height="360" aria-label="Grid" data-i18n-label="grid.label"></canvas>
+        <figcaption data-i18n="preview.original">Original</figcaption>
+      </figure>
+      <figure>
+        <div class="result-box"><canvas id="grid-result" width="480" height="360"></canvas><span class="result-note" id="grid-result-note"></span></div>
+        <figcaption><span data-i18n="preview.result">Preview</span> <span id="grid-result-info"></span></figcaption>
+      </figure>
+      <label class="preview-frame"><span data-i18n="preview.frame">Preview frame</span>
+        <input type="range" id="preview-position" min="0" max="1000" value="500" disabled>
+        <span class="time" id="preview-time">0:00</span>
+      </label>
+    </div>
+    <div class="actions">
+      <button type="button" class="primary" id="analyze" disabled data-i18n="analyze">Analyze</button>
+      <button type="button" class="ghost" id="cancel-analyze" hidden data-i18n="cancel">Cancel</button>
+      <span class="hint" id="analyze-hint"></span>
+    </div>
+    <div class="progress-list" id="analysis-progress" hidden>
+      <div class="progress" id="p-dict"><span class="label" data-i18n="progress.dict">Dictionary</span><progress max="1" value="0"></progress><span class="detail"></span></div>
+      <div class="progress" id="p-frames"><span class="label" data-i18n="progress.frames">Frames</span><progress max="1" value="0"></progress><span class="detail"></span></div>
+      <div class="progress" id="p-glyphs"><span class="label" data-i18n="progress.glyphs">Glyphs</span><progress max="1" value="0"></progress><span class="detail"></span></div>
+    </div>
+    <p class="error" id="analyze-error" hidden></p>
+  </section>
+
+  <section class="card" id="step-preview" hidden>
+    <h2><span class="num">3</span><span data-i18n="step.preview">Preview</span></h2>
+    <div class="toggles">
+      <label class="switch"><input type="checkbox" id="show-original" checked><span data-i18n="toggle.original">Show original frame</span></label>
+      <label class="switch"><input type="checkbox" id="show-info" checked><span data-i18n="toggle.info">Show glyphs used</span></label>
+    </div>
+    <div class="stage"><canvas id="preview"></canvas></div>
+    <div class="transport">
+      <button type="button" id="play" aria-label="Play">▶</button>
+      <input type="range" id="scrub" min="0" max="0" value="0" aria-label="Frame" data-i18n-label="scrub">
+      <span class="time" id="time">0:00 / 0:00</span>
+    </div>
+    <p class="summary" id="summary"></p>
+  </section>
+
+  <section class="card" id="step-export" hidden>
+    <h2><span class="num">4</span><span data-i18n="step.export">Export</span></h2>
+    <div class="export-options">
+      <label class="field"><span data-i18n="height">Height</span>
+        <select id="height">
+          <option value="720">720p</option>
+          <option value="1080" selected>1080p</option>
+          <option value="1440">1440p</option>
+          <option value="2160">2160p</option>
+        </select>
+      </label>
+      <label class="field"><span data-i18n="codec">Codec</span>
+        <select id="codec">
+          <option value="auto" data-i18n="codec.auto">Auto</option>
+          <option value="avc">H.264</option>
+          <option value="hevc">H.265</option>
+          <option value="vp9">VP9</option>
+          <option value="av1">AV1</option>
+        </select>
+      </label>
+      <label class="field"><span data-i18n="quality">Quality</span>
+        <select id="quality">
+          <option value="0.08" data-i18n="quality.standard">Standard</option>
+          <option value="0.16" selected data-i18n="quality.high">High</option>
+          <option value="0.32" data-i18n="quality.max">Maximum</option>
+        </select>
+      </label>
+      <label class="switch" id="include-audio-wrap" hidden><input type="checkbox" id="include-audio" checked><span data-i18n="includeAudio">Include audio</span></label>
+      <label class="switch" id="save-direct-wrap" hidden><input type="checkbox" id="save-direct" checked><span data-i18n="saveDirect">Save directly to a file</span></label>
+    </div>
+    <p class="hint" id="export-size"></p>
+    <div class="actions">
+      <button type="button" class="primary" id="export" data-i18n="export.button">Export MP4</button>
+      <button type="button" class="ghost" id="cancel-export" hidden data-i18n="cancel">Cancel</button>
+      <button type="button" class="ghost" id="download-text" data-i18n="saveText">Save text (.txt)</button>
+    </div>
+    <div class="progress" id="p-export" hidden><span class="label" data-i18n="progress.export">Export</span><progress max="1" value="0"></progress><span class="detail"></span></div>
+    <p class="done" id="export-done" hidden></p>
+    <p class="error" id="export-error" hidden></p>
+  </section>
+</main>
+
+<footer class="wrap credits">
+  <p data-i18n="credits.method">How characters are chosen: each cell is reduced to 32×24 and blurred, then compared with 410,510 glyphs rendered from all 244 Noto, GNU Unifont and Jigmo fonts (Unicode 17, 155,230 code points). The search is exhaustive over features compressed to 128 dimensions with PCA.</p>
+  <p data-i18n-html="credits.fonts">Fonts: <a href="https://notofonts.github.io/">Noto</a> (SIL Open Font License 1.1), <a href="https://unifoundry.com/unifont/">GNU Unifont</a> (GPL 2.0+ with font embedding exception / OFL 1.1), <a href="https://kamichikoichi.github.io/jigmo/">Jigmo</a> (CC0 1.0). Unicode data: Unicode License v3. Video processing: <a href="https://mediabunny.dev/">Mediabunny</a> (MPL 2.0). See <a href="LICENSES.html">licenses</a>.</p>
+</footer>
+</body>
+</html>
