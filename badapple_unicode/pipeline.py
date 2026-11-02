@@ -18,6 +18,7 @@ from PIL import Image, ImageDraw
 from .glyphs import Dictionary, MODES, normalize_glyph
 from .search import exact_search
 from .video import Frames, extract_frames, render_video, ui_font
+from .unicode_blocks import UNICODE_VERSION
 from .unicode_names import unicode_name
 
 
@@ -206,7 +207,7 @@ def render_existing(results: Path, output: Path | None, frame_cache: Path, *,
                   "glyph_renderer": glyph_renderer, "supersample": supersample,
                   "layout": layout, "original_preview": layout == "annotated",
                   "caption_layout": "fixed-columns-unicode-lines-v1" if layout == "annotated" else None,
-                  "unicode_blocks_version": "17.0.0" if layout == "annotated" else None,
+                  "unicode_blocks_version": UNICODE_VERSION if layout == "annotated" else None,
                   "number_line_domains": ["U+0000..U+10FFFF","current Unicode block"] if layout == "annotated" else [],
                   "reused_matches": str((results / "frames.jsonl").resolve()),
                   "matches_sha256": hashlib.sha256((results / "frames.jsonl").read_bytes()).hexdigest(),

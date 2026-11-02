@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-UNIFONT_VERSION = "17.0.05"
+UNIFONT_VERSION = "18.0.01"
 SOURCE_REPO = "bad-apple-lab/Bad-Apple"
 
 

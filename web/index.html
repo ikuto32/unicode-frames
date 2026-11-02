@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Unicode Frames</title>
-<meta name="description" content="Redraw every frame of a video with the closest Unicode character, chosen from 410,510 glyphs. Runs entirely in your browser.">
+<meta name="description" content="Redraw every frame of a video with the closest Unicode character, chosen from 410,823 glyphs. Runs entirely in your browser.">
 <link rel="stylesheet" href="style.css">
 <script type="module" src="js/app.js"></script>
 </head>
@@ -16,7 +16,7 @@
       <button type="button" class="lang" id="lang" lang="ja" data-i18n="lang.switch">日本語</button>
     </div>
     <h1>Unicode Frames</h1>
-    <p class="lede" data-i18n="lede">Redraws every frame of a video with the closest Unicode character, chosen from 410,510 glyphs. You decide how many characters fill the screen.</p>
+    <p class="lede" data-i18n="lede">Redraws every frame of a video with the closest Unicode character, chosen from 410,823 glyphs. You decide how many characters fill the screen.</p>
     <p class="privacy" data-i18n="privacy">Your video is never uploaded. Analysis and export run entirely in this browser.</p>
   </div>
 </header>
@@ -24,7 +24,7 @@
 <main class="wrap">
   <section class="card consent" id="data-card" hidden>
     <h2 data-i18n="consent.title">Download the glyph data</h2>
-    <p data-i18n="consent.body">To redraw videos in your browser, this site needs its glyph dictionary: the shapes and matching data of all 410,510 glyphs. It is downloaded once and kept in this browser, so later visits load it without downloading again.</p>
+    <p data-i18n="consent.body">To redraw videos in your browser, this site needs its glyph dictionary: the shapes and matching data of all 410,823 glyphs. It is downloaded once and kept in this browser, so later visits load it without downloading again.</p>
     <p class="consent-size" id="consent-size"></p>
     <div class="actions" id="consent-actions">
       <button type="button" class="primary" id="consent-accept"></button>
@@ -184,7 +184,7 @@
 
 <footer class="wrap credits">
   <p class="stored-data" id="stored-data" hidden><span id="stored-data-text"></span> <button type="button" class="link-button" id="delete-data" data-i18n="data.delete">Delete downloaded data</button></p>
-  <p data-i18n="credits.method">How characters are chosen: each cell is reduced to 32×24 and blurred, then compared with 410,510 glyphs rendered from all 244 Noto, GNU Unifont and Jigmo fonts (Unicode 17, 155,230 code points). The search is exhaustive over features compressed to 128 dimensions with PCA.</p>
+  <p data-i18n="credits.method">How characters are chosen: each cell is reduced to 32×24 and blurred, then compared with 410,823 glyphs rendered from all 244 Noto, GNU Unifont and Jigmo fonts (Unicode 18, 155,580 code points). The search is exhaustive over features compressed to 128 dimensions with PCA.</p>
   <p data-i18n-html="credits.fonts">Fonts: <a href="https://notofonts.github.io/">Noto</a> (SIL Open Font License 1.1), <a href="https://unifoundry.com/unifont/">GNU Unifont</a> (GPL 2.0+ with font embedding exception / OFL 1.1), <a href="https://kamichikoichi.github.io/jigmo/">Jigmo</a> (CC0 1.0). Unicode data: Unicode License v3. Video processing: <a href="https://mediabunny.dev/">Mediabunny</a> (MPL 2.0). See <a href="LICENSES.html">licenses</a>.</p>
 </footer>
 </body>

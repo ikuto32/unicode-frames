@@ -68,7 +68,7 @@ def test_complete_fractional_fps_video_audio_and_unicode_export(synthetic_fonts,
     assert rerender["glyph_renderer"] == "outline"
     assert rerender["supersample"] == 2
     assert rerender["caption_layout"] == "fixed-columns-unicode-lines-v1"
-    assert rerender["unicode_blocks_version"] == "17.0.0"
+    assert rerender["unicode_blocks_version"] == "18.0.0"
     assert (output / "frames.jsonl").read_bytes() == recorded_bytes
     high_quality = probe(output / "high-quality.mp4")
     assert high_quality["has_audio"]

@@ -12,6 +12,8 @@ from badapple_unicode.unicode_names import unicode_name
 def test_supplementary_algorithmic_names():
     assert unicode_name(0x327C1) == "CJK UNIFIED IDEOGRAPH-327C1"
     assert unicode_name(0x17000) == "TANGUT IDEOGRAPH-17000"
+    assert unicode_name(0x3D000) == "SMALL SEAL CHARACTER-3D000"
+    assert unicode_name(0x18E00) == "JURCHEN CHARACTER-18E00"
 
 
 def test_unicode_filter_rejects_controls_spaces_private_unassigned():

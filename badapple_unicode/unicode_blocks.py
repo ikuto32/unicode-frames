@@ -1,4 +1,4 @@
-"""Unicode 17 block names and inclusive ranges from the official UCD."""
+"""Unicode 18 block names and inclusive ranges from the official UCD."""
 from __future__ import annotations
 
 from bisect import bisect_right
@@ -7,6 +7,7 @@ from functools import lru_cache
 from importlib.resources import files
 
 MAX_CODEPOINT = 0x10FFFF
+UNICODE_VERSION = "18.0.0"
 
 
 @dataclass(frozen=True)
@@ -18,9 +19,9 @@ class UnicodeBlock:
 
 @lru_cache(maxsize=1)
 def blocks() -> tuple[UnicodeBlock, ...]:
-    data = files("badapple_unicode").joinpath("data/Blocks-17.0.0.txt").read_text(encoding="utf-8")
-    if "# Blocks-17.0.0.txt" not in data[:100]:
-        raise ValueError("Expected official Unicode 17.0 block data")
+    data = files("badapple_unicode").joinpath(f"data/Blocks-{UNICODE_VERSION}.txt").read_text(encoding="utf-8")
+    if f"# Blocks-{UNICODE_VERSION}.txt" not in data[:100]:
+        raise ValueError(f"Expected official Unicode {UNICODE_VERSION} block data")
     result = []
     for line in data.splitlines():
         line = line.split("#",1)[0].strip()

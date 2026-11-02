@@ -9,4 +9,4 @@ pillow==13.0.0
 pluggy==1.7.0
 Pygments==2.21.0
 pytest==9.2.0
-unicodedata2==17.0.0
+unicodedata2==18.0.0

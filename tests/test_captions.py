@@ -11,8 +11,11 @@ def record(cp=0x13355,font="NotoSansEgyptianHieroglyphs-Regular.ttf"):
     return {"codepoint":cp,"name":"EGYPTIAN HIEROGLYPH U031","font":font}
 
 
-def test_official_unicode_17_blocks_and_inclusive_endpoints():
-    assert len(blocks()) == 346
+def test_official_unicode_18_blocks_and_inclusive_endpoints():
+    assert len(blocks()) == 353
+    seal = unicode_block(0x3D000)
+    assert (seal.name,seal.start,seal.end) == ("Seal",0x3D000,0x3FC3F)
+    assert unicode_block(0x18E00).name == "Jurchen"
     latin = unicode_block(0x41)
     assert (latin.name,latin.start,latin.end) == ("Basic Latin",0,0x7F)
     egypt = unicode_block(0x13355)

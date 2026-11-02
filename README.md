@@ -20,7 +20,7 @@ This tool picks, for every frame of Bad Apple!!, the **single real Unicode chara
 - The original frame and the glyphs in use (code point, block, character name, font, number lines) can each be shown or hidden.
 - Export is MP4 via WebCodecs (H.264 / H.265 / VP9 / AV1). Audio can be included or removed. When included, it is copied as-is if MP4 can hold its format, and re-encoded to AAC or Opus otherwise. The characters can also be saved as `.txt` (one frame per line).
 
-Matching uses the same 410,510 glyphs as the command-line tool. The features are the same 32×24 with a 0.65 blur; Pillow's Lanczos resize and GaussianBlur are ported down to their rounding (tests confirm pixel-for-pixel agreement with Pillow). To make the data small enough to serve, the 768-dimensional features are reduced to 128 dimensions with PCA and stored as int8 with one global scale (52 MB, keeping 91.3% of the variance). WebGPU int8 dot products compare every candidate, and ties go to the candidate that comes first in the dictionary. Without WebGPU, Web Workers do the same computation. On Bad Apple with one character per frame (6,955 frames), 81.0% of frames get exactly the same character as the command-line tool's 768-dimensional exhaustive search. Where they differ, the chosen character's distance is on average only 0.6% above the best one.
+Matching uses the same 410,823 glyphs as the command-line tool. The features are the same 32×24 with a 0.65 blur; Pillow's Lanczos resize and GaussianBlur are ported down to their rounding (tests confirm pixel-for-pixel agreement with Pillow). To make the data small enough to serve, the 768-dimensional features are reduced to 128 dimensions with PCA and stored as int8 with one global scale (52 MB, keeping 91.3% of the variance). WebGPU int8 dot products compare every candidate, and ties go to the candidate that comes first in the dictionary. Without WebGPU, Web Workers do the same computation. On Bad Apple with one character per frame (6,955 frames, measured with the Unicode 17.0 dictionary), 81.0% of frames get exactly the same character as the command-line tool's 768-dimensional exhaustive search. Where they differ, the chosen character's distance is on average only 0.6% above the best one.
 
 Block selection is a bit mask built from each candidate's code point (`data/codepoints.bin`); the GPU search skips candidates outside the mask. Glyph outlines are stored per candidate in `data/glyphs-*.bin`. Unifont glyphs are stored as bitmaps, keeping their pixel shapes exactly.
 
@@ -89,11 +89,11 @@ The versions it was tested with are in `requirements-lock.txt`.
 
 - For every family in the [official Noto distribution repository](https://github.com/notofonts/notofonts.github.io), the Full Regular is fetched. Families without a Full build use the Unhinted build, and families without a Regular use an available instance. This covers Sans / Serif / Mono and historic scripts and symbols.
 - [Noto CJK](https://github.com/notofonts/noto-cjk) Sans / Serif in all five regions and the monochrome [Noto Emoji](https://github.com/google/fonts/tree/main/ofl/notoemoji) are included.
-- [GNU Unifont 17.0.05](https://ftp.gnu.org/gnu/unifont/unifont-17.0.05/) is added: the base plane, upper planes, Japanese and Traditional Chinese versions.
+- [GNU Unifont 18.0.01](https://ftp.gnu.org/gnu/unifont/unifont-18.0.01/) is added: the base plane, upper planes, Japanese and Traditional Chinese versions.
 - Noto and Unifont leave large gaps in the CJK extensions, so the three [Jigmo 2025-09-12](https://kamichikoichi.github.io/jigmo/) fonts are added too. `fetch --no-jigmo` leaves them out.
 - **To use every weight, width and italic as well, run `fetch --all-styles` or `.\run.ps1 -AllStyles`.** By default each family's standard style is used. Variable fonts are not enumerated across their continuous axes; their default instance is drawn.
 
-The targets are Unicode 17's assigned scalar values, excluding control, format, private-use, surrogate, unassigned, whitespace and replacement characters. Combining characters are included when they draw ink on their own. Each font's cmap and glyph IDs are checked, and empty drawings and tofu identical to `.notdef` are removed. Real square symbols are not excluded just because of their shape.
+The targets are Unicode 18's assigned scalar values, excluding control, format, private-use, surrogate, unassigned, whitespace and replacement characters. Combining characters are included when they draw ink on their own. Each font's cmap and glyph IDs are checked, and empty drawings and tofu identical to `.notdef` are removed. Real square symbols are not excluded just because of their shape.
 
 By default every eligible character present in each font is a candidate. The same character from another font is a separate candidate if it looks different. `build --fallback-only` is a faster option that keeps only the first font that can draw each character.
 
@@ -159,7 +159,7 @@ Unifont's stair-stepped outlines are the pixel shapes of the original font. Draw
 
 The bottom captions use a monospaced font and show the code point, character name, font name, normalization mode and frame number at fixed positions. Lines share baselines, so a long font name never moves the fields after it. The frame number has a fixed number of digits.
 
-Next to the code point are the Unicode block name and its range. The data is the official Unicode 17 `Blocks.txt`, bundled in the package, with its license in `badapple_unicode/data/UNICODE-LICENSE.txt`.
+Next to the code point are the Unicode block name and its range. The data is the official Unicode 18 `Blocks.txt`, bundled in the package, with its license in `badapple_unicode/data/UNICODE-LICENSE.txt`.
 
 - The `UNICODE` number line covers every code point from U+0000 to U+10FFFF. The character's block is shown in teal and the chosen character's position in yellow. The short ticks mark the start of each Unicode plane.
 - The `BLOCK` number line zooms in from the start to the end of the current block, so positions can be read even for characters that crowd the left end of the whole Unicode range.
@@ -198,11 +198,13 @@ Characters that amount to a blank page are excluded from the candidates, so even
 
 ## Reference: results on the author's machine
 
-244 fonts, 155,230 code points, 410,510 visually distinct candidates. All 6,955 frames were searched exhaustively with FAISS on the CPU, and a 1280×960 video with audio was written with H.264 NVENC. Matching and rendering took about 122 seconds in total; building the dictionary took about 440 seconds. 902 distinct characters were chosen.
+The Unicode 18.0 dictionary has 244 fonts, 155,580 code points and 410,823 visually distinct candidates, and took about 460 seconds to build. Unicode 18.0 added 13,007 eligible code points, but the font set draws only 350 of them, all from GNU Unifont 18.0.01; no font in the set covers the new Seal, Jurchen and Archaic Cuneiform Numerals blocks yet.
+
+The measurements below were made with the Unicode 17.0 dictionary (244 fonts, 155,230 code points, 410,510 visually distinct candidates). All 6,955 frames were searched exhaustively with FAISS on the CPU, and a 1280×960 video with audio was written with H.264 NVENC. Matching and rendering took about 122 seconds in total; building the dictionary took about 440 seconds. 902 distinct characters were chosen.
 
 The mean MSE over 128 samples was 0.061099 for stretch and 0.083048 for fit, about 26% lower for stretch.
 
-4,381 characters are missing or draw no ink on their own: 3,995 Egyptian hieroglyphs, 240 variation selectors, 115 Tangut components, 30 Tangut ideographs and 1 empty Hangul filler.
+With Unicode 18.0, 17,038 characters are missing or draw no ink on their own, mainly 11,328 Seal characters, 3,995 Egyptian hieroglyphs, 965 Jurchen characters and radicals, 311 Archaic Cuneiform Numerals and 240 variation selectors. The full list is in `missing.tsv`.
 
 ## Tests
 
@@ -222,4 +224,4 @@ This repository does not include the fonts or the source video. `fetch` download
 
 - Source video: the public copy in [bad-apple-lab/Bad-Apple](https://github.com/bad-apple-lab/Bad-Apple). Rights to the original video and music belong to their respective owners.
 - Fonts: Noto (SIL OFL 1.1), GNU Unifont (GPL with font embedding exception / OFL), Jigmo (CC0 1.0)
-- Unicode data: `badapple_unicode/data/Blocks-17.0.0.txt` is under Unicode, Inc.'s [Unicode License v3](badapple_unicode/data/UNICODE-LICENSE.txt).
+- Unicode data: `badapple_unicode/data/Blocks-18.0.0.txt` is under Unicode, Inc.'s [Unicode License v3](badapple_unicode/data/UNICODE-LICENSE.txt).
