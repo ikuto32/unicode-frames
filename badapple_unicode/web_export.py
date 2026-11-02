@@ -29,7 +29,7 @@ from .unicode_names import unicode_name
 SCHEMA = 1
 COORDINATE_MAX = 4095
 FEATURE_CHUNK_ROWS = 1 << 17
-GLYPH_FILE_BYTES = 40 << 20
+GLYPH_FILE_BYTES = 20 << 20  # Cloudflare Pages accepts files up to 25 MiB
 KIND_OUTLINE, KIND_BITMAP, KIND_PNG = 0, 1, 2
 OP_MOVE, OP_LINE, OP_QUAD, OP_CUBIC, OP_CLOSE = range(5)
 
