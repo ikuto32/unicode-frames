@@ -42,6 +42,12 @@ node tools/serve-web.mjs 8000
 .\tools\publish-pages.ps1
 ```
 
+Cloudflareにも置けます（静的ファイルへのリクエストは無料・無制限）。Workerの静的アセットとして、指定したドメインだけで配信します。ドメインは同じCloudflareアカウントのゾーンである必要があります。初回は `npx wrangler@4.151.2 login` でログインします。字形ファイルはCloudflareの上限（1ファイル25 MiB）に収まるよう20MBごとに分けています。
+
+```powershell
+.\tools\publish-cloudflare.ps1 -Domain ikutotest.xyz
+```
+
 初回の訪問者は辞書データ約55MBをダウンロードします（2回目以降はブラウザのキャッシュから読み込みます）。GitHub Pagesの帯域の目安は月100GBです。
 
 対応ブラウザ：WebCodecsが必要です（Chrome / Edge、Safari、Firefoxの最近の版）。WebGPUがあると照合が大幅に速くなります。
