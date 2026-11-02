@@ -1,76 +1,78 @@
-# Bad Apple!! / 1フレーム = Unicode 1文字
+# Bad Apple!! / One Unicode character per frame
 
-**ブラウザ版：https://unicode-frames.ikutotest.xyz/** （任意の動画で、インストール不要）
+**English** | [日本語](README.ja.md)
 
-Bad Apple!! の各フレームに最も近い **実在のUnicode 1文字** を、約41万の字形候補から全探索で選び、動画にするツールです。中央に選ばれた文字、右上に元映像、下部に `U+XXXX 文字名` とUnicode上の位置を表示します。音声は元動画から取り込みます。
+**Web version: https://unicode-frames.ikutotest.xyz/** (any video, nothing to install)
 
-- 4列×3行の12文字版: [docs/GRID-4X3.md](docs/GRID-4X3.md)
-- 8列×6行の48文字版: [docs/GRID-8X6.md](docs/GRID-8X6.md)
-- ブラウザ版（任意の動画・任意の文字数）: [web/](web/) — 下の「ブラウザ版」を参照
+This tool picks, for every frame of Bad Apple!!, the **single real Unicode character** that looks most like it, by exhaustive search over about 410,000 glyph candidates, and turns the result into a video. The chosen character fills the center, the original video plays in the top-right corner, and the bottom shows `U+XXXX CHARACTER NAME` and where the character sits in Unicode. The audio is taken from the source video.
 
-## ブラウザ版
+- 4 columns × 3 rows, 12 characters per frame: [docs/GRID-4X3.md](docs/GRID-4X3.md) (Japanese)
+- 8 columns × 6 rows, 48 characters per frame: [docs/GRID-8X6.md](docs/GRID-8X6.md) (Japanese)
+- Web version (any video, any number of characters): [web/](web/) — see "Web version" below
 
-[web/](web/) は、任意の動画から同じスタイルの動画を作る静的サイトです。Cloudflareで公開しています。動画はアップロードせず、解析も書き出しもブラウザ内で行います。UIは英語（既定）と日本語です。
+## Web version
 
-- 画面に使う文字数を列×行で指定します（1×1〜64×48）。各マスを独立に照合します。
-- 使うUnicodeブロックを選べます。プリセット（ASCII、ラテン文字、かな、漢字、罫線・ブロック図形、点字、絵文字）と、名前・コードポイントでの絞り込みがあります。選んだブロックはブラウザに保存されます。空白を候補に含めるかも切り替えられ、こちらは再解析なしで反映されます。
-- 設定画面で、選んだ位置の1フレームをその設定で照合したプレビューを表示します。文字数やブロックを変えるとすぐに更新されます。
-- 元フレームと使用した字形（コードポイント、ブロック、文字名、書体、数直線）の表示を切り替えられます。
-- 書き出しはWebCodecsによるMP4（H.264 / H.265 / VP9 / AV1）です。音声は付けるか消すかを選べます。付ける場合、MP4に入る形式ならそのままコピーし、それ以外はAACかOpusに再エンコードします。文字列も `.txt`（1フレーム1行）で保存できます。
+[web/](web/) is a static site that makes videos in the same style from any video. It is hosted on Cloudflare. Videos are never uploaded: analysis and export both run in the browser. The UI is in English (default) and Japanese.
 
-照合はCLIと同じ410,510字形が対象です。特徴量はCLIと同じ32×24・ぼかし0.65で、PillowのLanczos縮小とGaussianBlurの丸めまで移植しています（Pillowと全画素一致することをテストで確認）。配信できるサイズにするため、768次元の特徴量をPCAで128次元に圧縮し、全次元共通のスケールでint8にしています（52MB、分散の91.3%を保持）。WebGPUのint8内積で全候補を総当たりし、同距離なら辞書の先頭の候補を選びます。WebGPUがない環境ではWeb Workerで同じ計算をします。Bad Appleの1文字版（6,955フレーム）では、CLIの768次元全探索と同じ文字を選んだフレームが81.0%でした。異なるフレームも、選んだ文字の距離は最適値と平均0.6%しか違いません。
+- Choose how many characters fill the screen, as columns × rows (1×1 to 64×48). Each cell is matched independently.
+- Choose which Unicode blocks may be used. There are presets (ASCII, Latin, Kana, CJK ideographs, box and block shapes, Braille, emoji) and a filter by name or code point. The selection is remembered in the browser. Whether whitespace may be used can also be toggled, and that change applies without re-analyzing.
+- The settings step shows a preview: one frame, at a position you choose, matched with the current settings. It updates as soon as the character count or blocks change.
+- The original frame and the glyphs in use (code point, block, character name, font, number lines) can each be shown or hidden.
+- Export is MP4 via WebCodecs (H.264 / H.265 / VP9 / AV1). Audio can be included or removed. When included, it is copied as-is if MP4 can hold its format, and re-encoded to AAC or Opus otherwise. The characters can also be saved as `.txt` (one frame per line).
 
-ブロックの選択は候補ごとのコードポイント（`data/codepoints.bin`）から作るビットマスクで、GPUの全探索でマスク外の候補を飛ばします。字形の輪郭は候補ごとに `data/glyphs-*.bin` に格納します。Unifontはドット形状をそのままビットマップで持ちます。
+Matching uses the same 410,510 glyphs as the command-line tool. The features are the same 32×24 with a 0.65 blur; Pillow's Lanczos resize and GaussianBlur are ported down to their rounding (tests confirm pixel-for-pixel agreement with Pillow). To make the data small enough to serve, the 768-dimensional features are reduced to 128 dimensions with PCA and stored as int8 with one global scale (52 MB, keeping 91.3% of the variance). WebGPU int8 dot products compare every candidate, and ties go to the candidate that comes first in the dictionary. Without WebGPU, Web Workers do the same computation. On Bad Apple with one character per frame (6,955 frames), 81.0% of frames get exactly the same character as the command-line tool's 768-dimensional exhaustive search. Where they differ, the chosen character's distance is on average only 0.6% above the best one.
 
-サイトを開くと、まず必要なデータの量（約260MB）とブラウザの空き容量を表示し、許可を求めます。許可するとすべてのデータをダウンロードしてブラウザ（Cache Storage）に保存し、次回からは確認なしで保存済みのデータを使います。保存したデータはページ下部のリンクから削除できます。字形は保存済みのファイルから必要な部分だけを読み出すため、配信側にHTTP Rangeへの対応は要りません。
+Block selection is a bit mask built from each candidate's code point (`data/codepoints.bin`); the GPU search skips candidates outside the mask. Glyph outlines are stored per candidate in `data/glyphs-*.bin`. Unifont glyphs are stored as bitmaps, keeping their pixel shapes exactly.
 
-### データの生成と公開
+When the site opens, it first shows how much data it needs (about 260 MB) and the browser's free storage, and asks for permission. After you agree, it downloads all the data and keeps it in the browser (Cache Storage); later visits use the stored copy without asking. The stored data can be deleted from the link at the bottom of the page. Glyphs are read by slicing the stored files, so the host does not need to support HTTP Range requests.
 
-`fetch` と `build` で辞書を作った後、ブラウザ用のファイルを書き出します（約20秒、出力は約255MB）。
+### Building and publishing the data
+
+After building the dictionary with `fetch` and `build`, write the files for the browser (about 20 seconds, about 255 MB of output).
 
 ```powershell
 .venv\Scripts\python -m badapple_unicode web-export --dictionary cache/full-dictionary --output web/data
 ```
 
-ローカルで確認するには、`web/` を静的サーバーで配信します。
+To try it locally, serve `web/` with a static server.
 
 ```powershell
 node tools/serve-web.mjs 8000
 ```
 
-`web/data/` は生成物なのでmainブランチには含めません。公開はCloudflareのWorker（静的アセットのみ）で行います。静的ファイルへのリクエストは無料で、回数の制限もありません。指定したドメインだけで配信し、`workers.dev` やプレビュー用のURLは無効にします。ドメインは同じCloudflareアカウントのゾーンである必要があります。初回は `npx wrangler@4.151.2 login` でログインします。字形ファイルはCloudflareの上限（1ファイル25 MiB）に収まるよう20MBごとに分けています。
+`web/data/` is build output, so it is not committed to the main branch. The site is published as a Cloudflare Worker with static assets only. Requests for static assets are free and unlimited. It is served only on the given domain; the `workers.dev` and preview URLs are disabled. The domain must be a zone in the same Cloudflare account. Log in once with `npx wrangler@4.151.2 login`. Glyph files are split into 20 MB pieces to stay under Cloudflare's 25 MiB per-file limit.
 
 ```powershell
 .\tools\publish-cloudflare.ps1 -Domain unicode-frames.ikutotest.xyz
 ```
 
-Cloudflare Accessで既定ですべてのホストを保護している場合は、公開するホスト名に「Bypass / Everyone」のポリシーを付けたアプリケーションが必要です。
+If Cloudflare Access protects every host by default, the published hostname needs an Access application with a "Bypass / Everyone" policy.
 
-対応ブラウザ：WebCodecsが必要です（Chrome / Edge、Safari、Firefoxの最近の版）。WebGPUがあると照合が大幅に速くなります。
+Browser support: WebCodecs is required (recent Chrome / Edge, Safari, Firefox). WebGPU makes matching much faster.
 
-## 必要なもの
+## Requirements
 
-- Python 3.11以上
-- PATHに登録されたFFmpeg / FFprobe
-- （任意）NVIDIA GPU：CUDA対応PyTorch、またはグリッド版用のCUDAライブラリ（CUDA Toolkit + MSVC）
-- フォント・Unicodeデータ・元動画の取得に約1GBのディスクとネットワーク接続
+- Python 3.11 or later
+- FFmpeg / FFprobe on PATH
+- (Optional) NVIDIA GPU: PyTorch with CUDA, or the CUDA library for the grid versions (CUDA Toolkit + MSVC)
+- About 1 GB of disk and a network connection to fetch the fonts, Unicode data and source video
 
-## 実行（Windows）
+## Running (Windows)
 
 ```powershell
 .\setup.ps1
 .\run.ps1
 ```
 
-`run.ps1` はフォントと元動画の取得（`assets/`）、辞書の生成（`cache/`）、照合と動画出力（`output/`）を順に行います。2回目以降は辞書を再利用します。
+`run.ps1` fetches the fonts and source video (`assets/`), builds the dictionary (`cache/`), then matches and renders the video (`output/`). Later runs reuse the dictionary.
 
-別の動画も指定できます。
+You can also give another video.
 
 ```powershell
 .\run.ps1 -InputVideo 'D:\videos\badapple.mp4' -OutputDirectory output-custom
 ```
 
-## 実行（macOS / Linux / 手動）
+## Running (macOS / Linux / manual)
 
 ```bash
 python -m venv .venv
@@ -81,143 +83,143 @@ python -m venv .venv
 .venv/bin/python -m badapple_unicode play output/characters.txt
 ```
 
-動作確認したバージョンは `requirements-lock.txt` にあります。
+The versions it was tested with are in `requirements-lock.txt`.
 
-## 辞書とフォールバック
+## Dictionary and fallback
 
-- [公式Noto配布リポジトリ](https://github.com/notofonts/notofonts.github.io)の全ファミリーについて、Full版のRegularを取得します。Full版がないファミリーではUnhinted版、Regularがなければ利用可能なインスタンスを採用します。Sans / Serif / Mono / 歴史的文字・記号を含みます。
-- [Noto CJK](https://github.com/notofonts/noto-cjk)のSans / Serif、全5地域と、[Noto Emoji](https://github.com/google/fonts/tree/main/ofl/notoemoji)の単色フォントも含めます。
-- [GNU Unifont 17.0.05](https://ftp.gnu.org/gnu/unifont/unifont-17.0.05/)の基本面・補助面・日本語・繁体字版を加えます。
-- Noto / Unifontでは拡張漢字に大きな不足があるため、[Jigmo 2025-09-12](https://kamichikoichi.github.io/jigmo/)の3分割フォントも追加します。`fetch --no-jigmo` で外せます。
-- **全ウェイト・全幅・斜体も使う場合は `fetch --all-styles`、または `.\run.ps1 -AllStyles`**。通常は全ファミリーの標準書体を使います。可変フォントの連続する軸位置の全列挙は行わず、デフォルトインスタンスを描画します。
+- For every family in the [official Noto distribution repository](https://github.com/notofonts/notofonts.github.io), the Full Regular is fetched. Families without a Full build use the Unhinted build, and families without a Regular use an available instance. This covers Sans / Serif / Mono and historic scripts and symbols.
+- [Noto CJK](https://github.com/notofonts/noto-cjk) Sans / Serif in all five regions and the monochrome [Noto Emoji](https://github.com/google/fonts/tree/main/ofl/notoemoji) are included.
+- [GNU Unifont 17.0.05](https://ftp.gnu.org/gnu/unifont/unifont-17.0.05/) is added: the base plane, upper planes, Japanese and Traditional Chinese versions.
+- Noto and Unifont leave large gaps in the CJK extensions, so the three [Jigmo 2025-09-12](https://kamichikoichi.github.io/jigmo/) fonts are added too. `fetch --no-jigmo` leaves them out.
+- **To use every weight, width and italic as well, run `fetch --all-styles` or `.\run.ps1 -AllStyles`.** By default each family's standard style is used. Variable fonts are not enumerated across their continuous axes; their default instance is drawn.
 
-Unicode 17の割り当て済みスカラー値を対象にします。制御・書式・私用・サロゲート・未割り当て・空白・置換文字を除きます。結合文字は、単独でインクが描ける場合に含みます。書体ごとのcmapとグリフIDを検査し、空描画と `.notdef` と同一の豆腐を取り除きます。本物の四角記号を形だけで一括除外しません。
+The targets are Unicode 17's assigned scalar values, excluding control, format, private-use, surrogate, unassigned, whitespace and replacement characters. Combining characters are included when they draw ink on their own. Each font's cmap and glyph IDs are checked, and empty drawings and tofu identical to `.notdef` are removed. Real square symbols are not excluded just because of their shape.
 
-既定では各フォントに存在する全対象文字を候補にします。他フォントの同じ文字も見た目が違えば別候補です。`build --fallback-only` は、文字ごとに最初に描画できたフォントだけを使う高速オプションです。
+By default every eligible character present in each font is a candidate. The same character from another font is a separate candidate if it looks different. `build --fallback-only` is a faster option that keeps only the first font that can draw each character.
 
-128×96の共通キャンバスに、インク領域を切り出したグリフを描きます。伸張版と比率維持版の両キャンバスが画素単位で一致する候補をSHA-256で重複排除します。32×24への縮小やぼかしで偶然似た候補は重複扱いしません。別名・別コードポイント・フォントの対応はSQLiteの `aliases` に保持します。
+Glyphs are drawn, cropped to their ink, on a shared 128×96 canvas. Candidates whose stretched and aspect-preserving canvases both match pixel for pixel are deduplicated by SHA-256. Candidates that only look alike after the 32×24 reduction and blur are not treated as duplicates. Which other names, code points and fonts map to each glyph is kept in the SQLite `aliases` table.
 
-**フォント集合には未収録文字があります。全Unicodeを網羅したと偽らないため、件数は `manifest.json`、各文字は `missing.tsv` に出力します。** 空の結合文字・異体字セレクタなどもこの一覧に現れます。フォントを追加して別名の辞書をビルドすると補えます。
+**The font set does not cover every character. So as not to claim full Unicode coverage, the counts are written to `manifest.json` and each missing character to `missing.tsv`.** Empty combining marks, variation selectors and the like also appear in this list. Adding fonts and building a separate dictionary fills the gaps.
 
 ```powershell
 .venv\Scripts\python -m badapple_unicode build --fonts assets/fonts extra-fonts --dictionary cache/expanded
 ```
 
-## 正規化と比較
+## Normalization and comparison
 
-`stretch` は文字のインク領域を4:3の枠いっぱいに伸張し、`fit` は縦横比を保って中央配置します。元動画は両方式で同じ4:3キャンバスへ縮小します。両方を32×24にし、標準偏差0.65pxのGaussianぼかしを適用します。前景は白、背景は黒で固定します。フレーム単位の反転・鏡像・文字列・合成文字は使いません。
+`stretch` stretches the character's ink to fill a 4:3 frame; `fit` keeps its aspect ratio and centers it. The source video is reduced to the same 4:3 canvas in both modes. Both are brought to 32×24 and given a Gaussian blur with a 0.65 px standard deviation. The foreground is always white and the background black. Per-frame inversion, mirroring, character sequences and composed characters are not used.
 
-既定の `--normalization auto` は動画全体から等間隔の128フレームを選び、両方式で全候補を検索し、平均距離の小さい方式を採用します。`normalization-comparison.png` と `comparison.json` で選択の根拠を確認できます。`--normalization stretch` / `fit` で固定もできます。
+The default `--normalization auto` takes 128 evenly spaced frames from the whole video, searches every candidate with both modes and uses the mode with the smaller mean distance. `normalization-comparison.png` and `comparison.json` show the basis for the choice. `--normalization stretch` / `fit` fixes the mode.
 
-`--metric l2` は0〜1の画素値に対する平均二乗誤差です。`--metric iou` はぼかしたマスクの `1 - sum(min(A,B))/sum(max(A,B))` です。両方が空なら距離0と定義します。
+`--metric l2` is the mean squared error over pixel values from 0 to 1. `--metric iou` is `1 - sum(min(A,B))/sum(max(A,B))` over the blurred masks; when both are empty the distance is defined as 0.
 
-全探索は `||q||² + ||g||² - 2 qgᵀ` の行列積で行い、メモリを抑えるためチャンク分割します。近似探索や時間方向の平滑化は入れず、各フレームの最近傍を独立に選びます。
+The exhaustive search is the matrix product `||q||² + ||g||² - 2 qgᵀ`, split into chunks to limit memory. There is no approximate search and no temporal smoothing: each frame's nearest neighbor is chosen independently.
 
-| バックエンド | 特徴 |
+| Backend | Notes |
 | --- | --- |
-| `auto` | CUDA対応PyTorch → FAISS（L2）→ NumPyの順で選択 |
-| `faiss` | CPUの `IndexFlatL2` による全探索。学習不要 |
-| `numpy` | 追加の検索ライブラリ不要。L2 / IoU両方に対応 |
-| `cuda` | CUDA対応PyTorchが必要。float32、TF32無効。L2 / IoU両方に対応 |
+| `auto` | Picks PyTorch with CUDA → FAISS (L2) → NumPy, in that order |
+| `faiss` | Exhaustive search with CPU `IndexFlatL2`; no training needed |
+| `numpy` | No extra search library; supports both L2 and IoU |
+| `cuda` | Needs PyTorch with CUDA; float32 with TF32 off; supports both L2 and IoU |
 
-FAISSはオプション依存の `.[cpu]`、PyTorchは `.[gpu]` です。CUDA版のインストール方法は[PyTorch公式](https://pytorch.org/get-started/locally/)を参照してください。IoUのCPU全探索はL2より重いため、大規模処理ではCUDAを推奨します。
+FAISS is the optional dependency `.[cpu]` and PyTorch is `.[gpu]`. See the [PyTorch site](https://pytorch.org/get-started/locally/) for installing the CUDA build. IoU exhaustive search on the CPU is heavier than L2, so CUDA is recommended for large runs.
 
 ```powershell
 .venv\Scripts\python -m badapple_unicode run --dictionary cache/full-dictionary --backend cuda
 .venv\Scripts\python -m badapple_unicode run --dictionary cache/full-dictionary --metric iou --backend numpy
 ```
 
-元動画の分数fps（今回の素材では30000/1001）を維持します。VFR素材は同fpsのCFRにサンプリングします。`--fps 30` や `--max-frames 300` で変更できます。辞書とフレームは再利用可能なキャッシュに保存します。キャッシュ生成中に停止した `.building` フォルダーは使用しません。
+The source video's fractional frame rate (30000/1001 for this video) is kept. Variable-frame-rate sources are sampled to a constant rate at the same fps. `--fps 30` or `--max-frames 300` change this. The dictionary and frames are kept in reusable caches; a `.building` folder left by an interrupted run is never used.
 
-## 高解像度の描画・再出力
+## High-resolution rendering and re-rendering
 
-照合用の128pxグリフと、本編で表示するグリフの描画を分離しています。本編では元のTTF / OTFから輪郭を取得し、縦横の変形をベクトル座標に適用してから、表示サイズの2倍で描画して縮小します。小さなラスタ画像を引き伸ばすことによるぼやけを防ぎます。細い横線なども、伸張前のピクセル数に制約されません。照合用の32×24特徴量や選ばれる文字はこの変更で再計算しません。
+The 128 px glyphs used for matching are separate from the glyphs drawn in the video. For the video, outlines are taken from the original TTF / OTF, the stretch is applied to the vector coordinates, and the glyph is drawn at twice the display size and scaled down. This avoids the blur of enlarging a small raster image, and thin horizontal strokes are not limited by the pixels of the unstretched glyph. The 32×24 matching features and the chosen characters are not recomputed.
 
-既存の `frames.jsonl` を再利用して、2560×1920の高精細版を作るコマンドです。辞書生成・全探索を省略できます。
+This command reuses an existing `frames.jsonl` to make a 2560×1920 high-definition version, skipping dictionary building and the search.
 
 ```powershell
 .venv\Scripts\python -m badapple_unicode render --results output --encoder h264_nvenc
 ```
 
-出力は `output/badapple-unicode-hq.mp4` と、その描画条件を記録した `.render.json` です。NVIDIAエンコーダーがない場合は `--encoder libx264`、従来と同じ動画サイズなら `--size 1280x960` を指定できます。新規の `run` も既定で同じ輪郭描画を使います。`--supersample 1` から `4` まで指定できます。
+The output is `output/badapple-unicode-hq.mp4`, plus a `.render.json` recording the rendering settings. Without an NVIDIA encoder use `--encoder libx264`; for the original video size use `--size 1280x960`. New `run`s use the same outline rendering by default. `--supersample` accepts 1 to 4.
 
-文字と音声だけの版は次のコマンドで作成します。選ばれた1文字を4:3の画面いっぱいに描き、元映像の小窓・タイトル・字幕・数直線を表示しません。文字選択とフレームレートは既存結果を再利用します。
+This command makes a version with only the character and the audio. The chosen character fills the 4:3 screen, with no original-video inset, title, captions or number lines. The character choices and frame rate are reused from the existing results.
 
 ```powershell
 .venv\Scripts\python -m badapple_unicode render --results output --layout glyph-only --encoder h264_nvenc
 ```
 
-出力は `output/badapple-unicode-glyph-only.mp4`（2560×1920・音声付き）です。
+The output is `output/badapple-unicode-glyph-only.mp4` (2560×1920, with audio).
 
-元の書体・フォントコレクションのフェイス番号を維持します。SHA-256が辞書作成時と違うフォントは拒否し、意図せず別の書体へ変わることを防ぎます。表示用の高解像度キャッシュは `cache/full-dictionary/display-cache/` に保存します。比較用に旧方式を再現する場合だけ `--glyph-renderer cached` を指定します。
+The original font and face index within a font collection are kept. A font whose SHA-256 differs from when the dictionary was built is rejected, so the typeface never changes unexpectedly. The high-resolution display cache is stored in `cache/full-dictionary/display-cache/`. Use `--glyph-renderer cached` only to reproduce the old method for comparison.
 
-Unifontの階段状の輪郭は、元フォントが持つドット形状です。輪郭を直接描いても、別書体のような滑らかな曲線には変わりません。
+Unifont's stair-stepped outlines are the pixel shapes of the original font. Drawing the outlines directly does not turn them into smooth curves like other typefaces.
 
-## 字幕の固定とUnicode上の位置
+## Fixed captions and position in Unicode
 
-下部の字幕は等幅フォントを使い、コードポイント・文字名・書体名・正規化方式・フレーム番号を固定位置に表示します。行はベースラインで揃え、書体名が長くなっても後続の項目が動かないようにしています。フレーム番号は桁数を固定します。
+The bottom captions use a monospaced font and show the code point, character name, font name, normalization mode and frame number at fixed positions. Lines share baselines, so a long font name never moves the fields after it. The frame number has a fixed number of digits.
 
-コードポイントの横にUnicodeブロック名とその範囲を表示します。データはUnicode 17公式の `Blocks.txt` をパッケージに収録し、利用許諾文を `badapple_unicode/data/UNICODE-LICENSE.txt` に保持しています。
+Next to the code point are the Unicode block name and its range. The data is the official Unicode 17 `Blocks.txt`, bundled in the package, with its license in `badapple_unicode/data/UNICODE-LICENSE.txt`.
 
-- `UNICODE` の数直線はU+0000からU+10FFFFまでの全コードポイントを表します。所属ブロックを青緑色、選ばれた文字の位置を黄色で示します。短い目盛りはUnicodeの各面の開始位置です。
-- `BLOCK` の数直線は現在のブロックの先頭から末尾までを拡大したものです。Unicode全体では左端に密集する文字も、ブロック内の位置を読めます。
+- The `UNICODE` number line covers every code point from U+0000 to U+10FFFF. The character's block is shown in teal and the chosen character's position in yellow. The short ticks mark the start of each Unicode plane.
+- The `BLOCK` number line zooms in from the start to the end of the current block, so positions can be read even for characters that crowd the left end of the whole Unicode range.
 
-両方ともコードポイントの数値に比例した位置を使います。目盛りと端点のラベルは固定し、文字が変わるとマーカーだけが横に移動します。中央の文字を大きく保ちつつ、下部に数直線2本が収まるよう配置しています。
+Both use positions proportional to the code point value. The ticks and endpoint labels stay fixed; only the marker moves as the character changes. The layout keeps the central character large while fitting both number lines at the bottom.
 
 ```powershell
 .venv\Scripts\python -m badapple_unicode render --results output --output output/badapple-unicode-hq-position.mp4 --encoder h264_nvenc
 ```
 
-## 出力
+## Output
 
-| ファイル | 内容 |
+| File | Contents |
 | --- | --- |
-| `badapple-unicode.mp4` | 1280×960、文字＋元映像＋文字名＋音声 |
-| `badapple-unicode.poster.png` | 動画の静止画 |
-| `badapple-unicode-hq.mp4` | 元の文字選択を再利用した2560×1920の輪郭描画版 |
-| `badapple-unicode-hq-position.mp4` | 字幕固定・Unicodeブロック名・数直線2本を加えた高精細版 |
-| `badapple-unicode-glyph-only.mp4` | 画面いっぱいの1文字と音声だけの版 |
-| `characters.txt` | UTF-8、BOM・改行なし、1フレームにつき1スカラー値 |
-| `characters-collapsed.txt` | 隣り合う同じ文字を1文字にまとめた、改行なしのUTF-8文字列 |
-| `timing.json` | 分数fpsとフレーム数 |
-| `characters.zip` | 文字列・時刻情報・外部ライブラリ不要の再生スクリプト |
-| `frames.jsonl` | 各フレームの文字・名前・フォント・距離・時刻 |
-| `characters.srt` | 同じ選択が続く区間をまとめた字幕 |
-| `normalization-comparison.png` | 元フレーム・伸張・比率維持の比較 |
-| `comparison.json` / `summary.json` | 正規化選択・検索結果・処理時間のレポート |
+| `badapple-unicode.mp4` | 1280×960: character + original video + character name + audio |
+| `badapple-unicode.poster.png` | A still from the video |
+| `badapple-unicode-hq.mp4` | 2560×1920 outline-rendered version reusing the original choices |
+| `badapple-unicode-hq-position.mp4` | High-definition version with fixed captions, Unicode block name and two number lines |
+| `badapple-unicode-glyph-only.mp4` | Only the full-screen character and the audio |
+| `characters.txt` | UTF-8, no BOM or newlines, one scalar value per frame |
+| `characters-collapsed.txt` | Single-line UTF-8 text with runs of the same character merged into one |
+| `timing.json` | Fractional fps and frame count |
+| `characters.zip` | The text, timing and a playback script that needs no extra libraries |
+| `frames.jsonl` | Each frame's character, name, font, distance and time |
+| `characters.srt` | Subtitles that merge runs of the same choice |
+| `normalization-comparison.png` | Original frames next to the stretch and fit results |
+| `comparison.json` / `summary.json` | Reports on the normalization choice, search results and timings |
 
-`characters.txt` と `timing.json` を同じフォルダーに置くと `play` で再生できます。文字列をUnicode正規化するとコードポイント数が変わることがあるため、そのまま扱ってください。端末での見え方は端末のフォントフォールバックとセル寸法に依存します。結合文字や補助面の文字を表示できない端末もあります。動画は選ばれた元のフォントから描画するので、再生環境のフォントに左右されません。
+With `characters.txt` and `timing.json` in the same folder, `play` plays them back. Unicode normalization can change the number of code points, so keep the text as-is. How it looks in a terminal depends on the terminal's font fallback and cell size, and some terminals cannot show combining characters or characters from the upper planes. The video is drawn from the chosen original fonts, so it does not depend on the fonts where it is played.
 
-配布用の `characters.zip` は展開後に `python play_characters.py` だけで再生できます。Python以外の依存関係はありません。
+The distributable `characters.zip` plays with just `python play_characters.py` after extracting; it needs nothing but Python.
 
-`characters-collapsed.txt` もZIPに含めます。例えば `AAABBAA` は `ABA` になります。離れた場所での再出現は残し、Unicode正規化は行いません。文字数がフレーム数と異なるため、この短縮版には元のfps情報を適用しません。
+`characters-collapsed.txt` is also in the ZIP. For example, `AAABBAA` becomes `ABA`: separate reappearances are kept, and no Unicode normalization is applied. Its length differs from the frame count, so the original fps does not apply to it.
 
-白紙に相当する文字を候補から除いているので、真っ黒なフレームにも何らかの文字が選ばれます。
+Characters that amount to a blank page are excluded from the candidates, so even a completely black frame gets some character.
 
-## 参考：作者環境での実行結果
+## Reference: results on the author's machine
 
-244フォント、155,230コードポイント、見た目の異なる410,510候補。6,955フレームをFAISS CPUで全探索し、H.264 NVENCで1280×960の音声付き動画を書き出しました。照合と動画出力は合計約122秒、辞書生成は約440秒でした。選ばれた文字は902種類です。
+244 fonts, 155,230 code points, 410,510 visually distinct candidates. All 6,955 frames were searched exhaustively with FAISS on the CPU, and a 1280×960 video with audio was written with H.264 NVENC. Matching and rendering took about 122 seconds in total; building the dictionary took about 440 seconds. 902 distinct characters were chosen.
 
-128サンプルの平均MSEは伸張0.061099、比率維持0.083048で、伸張の方が約26%小さくなりました。
+The mean MSE over 128 samples was 0.061099 for stretch and 0.083048 for fit, about 26% lower for stretch.
 
-未収録・単独でインクを描けない文字は4,381字です。内訳はエジプト象形文字3,995、異体字セレクタ240、西夏文字の部品115、西夏文字30、空のハングルフィラー1です。
+4,381 characters are missing or draw no ink on their own: 3,995 Egyptian hieroglyphs, 240 variation selectors, 115 Tangut components, 30 Tangut ideographs and 1 empty Hangul filler.
 
-## テスト
+## Tests
 
 ```powershell
 .venv\Scripts\python -m pytest -q
 ```
 
-小さな人工フォントを使い、cmap未収録・豆腐・空白の除外、補助面、見た目の重複、後続フォントへのフォールバックを確認します。検索は直接計算した総当たり距離と照合します。FFmpegが利用できる環境では、分数fps、全フレーム、音声、文字列とメタデータの一致も確認します。輪郭描画、字幕レイアウトの固定、グリッド版の配置もテストしています。
+Small synthetic fonts check the exclusion of characters missing from the cmap, tofu and blanks, the upper planes, visual duplicates and fallback to later fonts. The search is checked against brute-force distances. Where FFmpeg is available, the tests also check the fractional frame rate, every frame, the audio, and that the text and metadata agree. Outline rendering, the fixed caption layout and the grid layouts are tested too.
 
-## ライセンス
+## License
 
-このリポジトリのコードは [MIT License](LICENSE) です。以下のフォント・動画・Unicodeデータはそれぞれのライセンスに従います。
+The code in this repository is under the [MIT License](LICENSE). The fonts, video and Unicode data below are under their own licenses.
 
-## 素材とライセンス
+## Assets and licenses
 
-このリポジトリにはフォント・元動画を含めません。`fetch` が実行時に取得し、取得元URL・Gitリビジョン・SHA-256を `assets/manifest.json`、動画の取得元を `assets/source.json` に記録します。各フォントのライセンス文書は `assets/licenses/` に保存されます。
+This repository does not include the fonts or the source video. `fetch` downloads them when run and records the source URLs, Git revisions and SHA-256 hashes in `assets/manifest.json`, and the video's source in `assets/source.json`. Each font's license text is saved in `assets/licenses/`.
 
-- 元動画：[bad-apple-lab/Bad-Apple](https://github.com/bad-apple-lab/Bad-Apple) の公開コピー。元映像・音源の権利はそれぞれの権利者に帰属します。
-- フォント：Noto（SIL OFL 1.1）、GNU Unifont（GPL with font embedding exception / OFL）、Jigmo（CC0 1.0）
-- Unicodeデータ：`badapple_unicode/data/Blocks-17.0.0.txt` は Unicode, Inc. の [Unicode License v3](badapple_unicode/data/UNICODE-LICENSE.txt) に従います。
+- Source video: the public copy in [bad-apple-lab/Bad-Apple](https://github.com/bad-apple-lab/Bad-Apple). Rights to the original video and music belong to their respective owners.
+- Fonts: Noto (SIL OFL 1.1), GNU Unifont (GPL with font embedding exception / OFL), Jigmo (CC0 1.0)
+- Unicode data: `badapple_unicode/data/Blocks-17.0.0.txt` is under Unicode, Inc.'s [Unicode License v3](badapple_unicode/data/UNICODE-LICENSE.txt).
